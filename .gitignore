@@ -1,2 +1,4 @@
 /node_modules/
-/CSV/
+*.csv
+test
+package-lock.json

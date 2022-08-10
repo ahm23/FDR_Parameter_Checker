@@ -1,39 +1,45 @@
 import fs from 'fs';
 import { parse } from 'csv-parse';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers'
+
+const argv = yargs(hideBin(process.argv)).argv
+
+const f_csv = argv.csv || null;
+const f_rose= argv.rose || null;
+
+if (!f_csv || !f_rose) {
+  console.log("Please enter the csv AND rose filepath as CLI arguments `--csv` and `--rose` respectively!");
+  process.exit(0);
+}
 
 const records = [];
-// Initialize the parser
+// Initialize CSV parser
 const parser = parse({
   delimiter: ','
 });
 // Use the readable stream api to consume records
 parser.on('readable', function(){
   let record;
-  while ((record = parser.read()) !== null) {
+  while ((record = parser.read()) !== null)
     records.push(record);
-  }
 });
-// database sent to inc..
-// Catch any error
 parser.on('error', function(err){
   console.error(err.message);
 });
-// Test that the parsed records matched the expected records
 parser.on('end', function(){
-  //console.log(records);
-  console.log(records.length)
-  run(genFDRObject(records))
-  //genFDRObject(records)
-
+  console.log("Parameter Count: ", records.length);
+  run(genFDRObject(records));
 });
-// Close the readable stream
 
-parser.write(fs.readFileSync("./CSV/FDRParameters.csv", `utf8`));
+parser.write(fs.readFileSync(f_csv, `utf8`));
 parser.end();
 
 let duplicates = [];
 
+// FDR Parameters -> Object + Duplicate Detector
 function genFDRObject(data) {
+  console.log('\n\nVERIFYING FOR DUPLICATE NAMES (Combined Parameters)\n-----------------------------------------------------');
   let FDRParameters = {};
   data.forEach(el => {
     if (!FDRParameters[el[0]]) {
@@ -43,12 +49,13 @@ function genFDRObject(data) {
       duplicates.push(el[0]);
     }
   });
-  console.log('\n\n')
   return FDRParameters;
 }
 
+// ROSE database verifier
 function run(FDRParameters) {
-  const ROSEDB = fs.readFileSync('./CSV/aug10', 'utf-8');
+  console.log('\n\nCHECKING ROSE DATABASE\n----------------------------');
+  const ROSEDB = fs.readFileSync(f_rose, 'utf-8');
   var parseNext = 0;
   var parseName = '';
   ROSEDB.split(/\r?\n/).forEach(line => {
@@ -90,9 +97,11 @@ function run(FDRParameters) {
   });
 }
 
+// Checkbox verifier function
 function checkbox(val, db_val) {
   const sep = val.split(',');
   let sum = 0;
+  // For whatever reason, rose stores the checked boxes as a sum. 1 = 1, 2 = 2, 3 = 4, and 4 = 8 in the ROSE database file. Ex: checkboxes 2 and 4 = 2+8 = 10.
   sep.forEach(v => {
     if (v == 3) sum+=4;
     else if (v == 4) sum+=8;
@@ -101,6 +110,7 @@ function checkbox(val, db_val) {
   return sum == db_val;
 }
 
+// Reverse checkbox mapping for human-readable text
 function checkboxReverse(val) {
   switch (val) {
     case 15:
@@ -126,7 +136,8 @@ function checkboxReverse(val) {
   }
 }
 
-
+// 12-bit text-based number range to binary converter
+// Ex. 12-8 = 111110000000
 function rangeToBinary(range) {
   const seg = range.split("-");
   let binary = '';
@@ -144,6 +155,7 @@ function rangeToBinary(range) {
   return binary;
 }
 
+// Number to 12-bit binary
 function numToBinary(num) {
   const stripped = Number(num).toString(2);
   let zeros = '';
